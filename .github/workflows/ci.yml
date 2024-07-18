@@ -1,0 +1,59 @@
+name: "Build & Tag"
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
+  pull_request:
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
+  workflow_dispatch:
+
+jobs:
+  run-playbooks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install pre-requisites
+        run: |
+          add-apt-repository ppa:ansible/ansible
+          apt update
+          apt install ansible -y
+
+      - name: Run playbook
+        uses: dawidd6/action-ansible-playbook@v2
+        with:
+          # Required, playbook filepath
+          playbook: main.yml
+          # Optional, directory where playbooks live
+          directory: ./meta
+          options: |
+            --verbose
+
+      - name: 'Get Previous tag'
+        if: github.ref == 'refs/heads/master'
+        id: previoustag
+        uses: WyriHaximus/github-action-get-previous-tag@v1
+        with:
+          fallback: 1.0.0
+
+      - name: Get next version
+        if: github.ref == 'refs/heads/master'
+        id: version
+        uses: technicallyjosh/next-version-action@v1
+        with:
+          version: ${{ steps.previoustag.outputs.tag }}
+
+      - name: Create Tag
+        if: github.ref == 'refs/heads/master'
+        uses: rickstaa/action-create-tag@v1
+        id: "tag_create"
+        with:
+          tag: ${{ steps.version.outputs.next_version }}
+          tag_exists_error: false
+          message: "Latest release"
